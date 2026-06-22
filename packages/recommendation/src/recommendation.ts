@@ -58,6 +58,18 @@ export const recommendNextSkill = (
   }
   const skillPool = Array.from(skillById.values());
   const skillSet = new Set(skillPool.map((skill) => skill.id));
+  const getProbability = (skillId: string): number => {
+    const skill = skillById.get(skillId);
+    if (!skill) return 0;
+    return (
+      logistic(
+        blendAbility(skill, request.abilities, weights) - skill.difficulty
+      ) ?? 0
+    );
+  };
+  const allSkillsMastered = skillPool.every(
+    (skill) => getProbability(skill.id) >= masteredThreshold
+  );
 
   const selectTargetWithZpdPrereqAwarePolicy = (): string => {
     if (skillPool.length === 0) {
@@ -80,6 +92,19 @@ export const recommendNextSkill = (
     const eligibleAll = skillPool.filter((skill) =>
       skill.prerequisites.every((pre) => mastered.get(pre) === true)
     );
+    if (
+      eligibleAll.length > 0 &&
+      skillPool.every((skill) => mastered.get(skill.id))
+    ) {
+      const reinforcementPool = eligibleAll.slice().sort((a, b) => {
+        const pa = probs.get(a.id) ?? 0;
+        const pb = probs.get(b.id) ?? 0;
+        if (pa !== pb) return pa - pb;
+        return (a.difficulty ?? 0) - (b.difficulty ?? 0);
+      });
+      return reinforcementPool[0]?.id ?? eligibleAll[0].id;
+    }
+
     let eligible = eligibleAll.filter((skill) => !mastered.get(skill.id));
     if (eligible.length === 0) {
       eligible = eligibleAll.slice();
@@ -302,6 +327,18 @@ export const recommendNextSkill = (
         traversed: updatedTrail,
         notes:
           "Candidate skill in ZPD",
+      };
+    }
+
+    if (allSkillsMastered && selfProb >= masteredThreshold) {
+      return {
+        targetSubjectId: request.subjectId,
+        candidateId: skillId,
+        probability: selfProb,
+        status: "recommended",
+        traversed: updatedTrail,
+        notes:
+          "All subject skills are mastered - reinforcing weakest mastered skill toward 100%",
       };
     }
 
