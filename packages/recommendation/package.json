@@ -1,6 +1,6 @@
 {
   "name": "@chimple/palau-recommendation",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "PAL recommendation engine utilities",
   "type": "module",
   "main": "dist/index.js",
